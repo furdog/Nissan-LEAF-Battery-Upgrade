@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 RESCUE MODE</title>
+    <style>
+        body {
+            background-color: #0000AA;
+            color: #FFFFFF;
+            font-family: "Lucida Console", "Courier New", monospace;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1.5;
+        }
+
+        .container {
+            border: 2px solid #FFFFFF;
+            padding: 20px;
+            max-width: 600px;
+            box-shadow: 10px 10px 0px #000000;
+        }
+
+        h1 {
+            background-color: #FFFFFF;
+            color: #0000AA;
+            display: inline-block;
+            padding: 0 10px;
+            margin-top: 0;
+        }
+
+        .status-box {
+            border: 1px dashed #FFFFFF;
+            padding: 10px;
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        nav ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        nav li {
+            margin: 10px 0;
+        }
+
+        a {
+            color: #FFFF00;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        a:hover {
+            background-color: #FFFF00;
+            color: #0000AA;
+        }
+
+        #qrcode {
+            background: white;
+            padding: 10px;
+            margin-top: 20px;
+            display: inline-block;
+        }
+
+        .footer {
+            margin-top: 30px;
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div id="log-window" style="width: 100%; height: 800px; background:#000; overflow-y:scroll; font-family:monospace; padding:10px;">
+        Waiting for logs...<br>
+    </div>
+
+    <script>
+        //var gateway = `ws://${window.location.hostname}/ws`;
+        var gateway = `ws://7.7.7.7/ws`;
+        var websocket = new WebSocket(gateway);
+
+	// Variable outside the function to remember the state
+	let lastColor = 'white'; 
+
+	websocket.onmessage = function(event) {
+	    const logWindow = document.getElementById('log-window');
+	    let message = event.data;
+
+	    // 1. Ignore blank messages
+	    if (!message || message.trim() === "") {
+		return; 
+	    }
+
+	    // 2. Map prefixes to colors
+	    const colors = {
+		'I': 'green',
+		'W': '#d4af37', // A readable "dark yellow"
+		'E': 'red'
+	    };
+
+	    // 3. Check for prefix and update lastColor if found
+	    const firstChar = message.charAt(0);
+	    if (colors[firstChar]) {
+		lastColor = colors[firstChar];
+	    }
+
+	    // 4. Append the message using the current or inherited color
+	    logWindow.innerHTML += `<span style="color: ${lastColor};">${message}</span><br>`;
+	    
+	    // 5. Auto-scroll
+	    logWindow.scrollTop = logWindow.scrollHeight;
+	};
+    </script>
+
+    <script src="qrcode.min.js"></script>
+    <script>
+        // Приклад даних для QR (можна вставити сюди backtrace)
+        const dumpData = "ERROR: Guru Meditation Error: Core 0 panic'ed (LoadStoreError). IP: 0x400d1234, Stack: 0x3ffb1234";
+        
+        new QRCode(document.getElementById("qrcode"), {
+            text: dumpData,
+            width: 128,
+            height: 128,
+            colorDark : "#000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.L
+        });
+    </script>
+</body>
+</html>
