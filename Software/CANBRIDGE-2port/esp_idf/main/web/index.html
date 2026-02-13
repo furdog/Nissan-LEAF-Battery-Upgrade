@@ -130,5 +130,24 @@
             correctLevel : QRCode.CorrectLevel.L
         });
     </script>
+
+
+	<input type="file" id="ota_file">
+	<button onclick="doUpload()">Update</button>
+
+	<script>
+	async function doUpload() {
+	    const file = document.getElementById('ota_file').files[0];
+	    if (!file) return;
+
+	    // Use fetch to send the file as a raw stream
+	    await fetch('/update', {
+		method: 'POST',
+		body: file, // This sends ONLY the bytes of the file
+		headers: { 'Content-Type': 'application/octet-stream' }
+	    });
+	    alert("Done!");
+	}
+	</script>
 </body>
 </html>
