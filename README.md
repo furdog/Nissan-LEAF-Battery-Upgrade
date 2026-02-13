@@ -1,3 +1,17 @@
+# ESP-IDF version of Nissan-LEAF-Battery-Upgrade
+> [!WARNING]
+> **ESP-IDF Adapter:** This branch is a specialized **adapter** designed to run STM32 software on ESP-IDF platform and espressif hardware.
+This port does not touch any of the original project files and only adds a wrapper layer to run original code in ESP-IDF environment/hardware.
+
+This is a first version. Only very basic wrapping of core functions are present. Not tested.
+
+Adapted functions:
+```C
+CQ_STATUS PushCan( uint8_t canNum, uint8_t TxRx, CAN_FRAME *frame );
+CQ_STATUS PopCan( uint8_t canNum, uint8_t TxRx, CAN_FRAME *frame );
+uint8_t LenCan( uint8_t canNum, uint8_t TxRx );
+```
+
 ![alt text](https://github.com/dalathegreat/Nissan-LEAF-Battery-Upgrade/blob/main/Software/CANBRIDGE-2port/Banner.jpg)
 
 # Nissan-LEAF-Battery-Upgrade
