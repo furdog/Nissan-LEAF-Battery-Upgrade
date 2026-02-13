@@ -278,7 +278,7 @@ void rescue_main(void);
 
 void app_main(void)
 {
-	//rescue_main(); /* Start RESCUE SERVER */
+	rescue_main(); /* Start RESCUE SERVER */
 
 	stw0.id = 0;
 	stw0.tx = GPIO_NUM_14;
