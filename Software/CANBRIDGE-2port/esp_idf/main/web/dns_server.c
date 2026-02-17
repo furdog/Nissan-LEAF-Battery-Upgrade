@@ -52,13 +52,13 @@ void dns_server_task(void *pvParameters) {
 		if (msg.malformed == 0u) {
 			uint32_t ip = source_addr.sin_addr.s_addr;
 
-			ESP_LOGI(TAG, "Query from %u.%u.%u.%u "
+			/*ESP_LOGI(TAG, "Query from %u.%u.%u.%u "
 				 "| Type: %s | Domain: %s",
 				 (unsigned int)(ip & 0xFF),
 				 (unsigned int)((ip >> 8) & 0xFF),
 				 (unsigned int)((ip >> 16) & 0xFF),
 				 (unsigned int)((ip >> 24) & 0xFF),
-				 dns_msg_get_type_str(&msg), msg.name);
+				 dns_msg_get_type_str(&msg), msg.name);*/
 		} else {
 			ESP_LOGI(TAG, "Query is malformed dns_tools.h, line: %u",
 				 msg.malformed);
