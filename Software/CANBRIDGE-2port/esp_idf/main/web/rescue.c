@@ -184,31 +184,6 @@ static void start_webserver(void) {
 	ws_server_start(&ws_server, &server);
 }
 
-// The function you want to run every second
-void my_periodic_action() {
-	char *text;
-	if (ws_server_peek_text_rx(&ws_server, &text) != 0) {
-		ESP_LOGI(TAG, "message arrived! %s", text);
-		ws_server_dequeue_text_rx(&ws_server, text);
-	}
-}
-
-void second_timer_task(void *pvParameters) {
-	// TickType_t stores the time of the last wake-up
-	TickType_t xLastWakeTime = xTaskGetTickCount();
-	
-	// Define the period (1000ms converted to FreeRTOS ticks)
-	const TickType_t xFrequency = pdMS_TO_TICKS(1000);
-
-	while (1) {
-		// Wait for the next cycle
-		vTaskDelayUntil(&xLastWakeTime, xFrequency);
-
-		// Call your function
-		my_periodic_action();
-	}
-}
-
 void dns_server_task(void *pvParameters);
 
 void rescue_main(void) {
@@ -222,7 +197,6 @@ void rescue_main(void) {
 
 	// Launch background tasks
 	xTaskCreate(dns_server_task,   "dns_server",   3072, NULL, 1, NULL);
-	xTaskCreate(second_timer_task, "one_sec_timer", 2048, NULL, 5, NULL);
 
 	// Finally, redirect system logs to our ring buffer
 	esp_log_set_vprintf(ws_logger_hook);
