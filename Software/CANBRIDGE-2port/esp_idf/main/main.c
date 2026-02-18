@@ -334,6 +334,7 @@ void can_bridge_main_loop() {
 	}*/
 }
 
+/* Port from arduino */
 void yieldIfNecessary(void)
 {
 	static uint64_t lastYield = 0;
