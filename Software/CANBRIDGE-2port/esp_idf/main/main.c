@@ -35,8 +35,8 @@ esp_err_t simple_twai_init(struct simple_twai *self)
 	twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
 	twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
-	//g_config.rx_queue_len = 100;
-	//g_config.tx_queue_len = 50;
+	g_config.rx_queue_len = 64;
+	g_config.tx_queue_len = 64;
 
 	g_config.controller_id = self->id;
 
@@ -160,7 +160,12 @@ void map_to_twai(CAN_FRAME *src, twai_message_t *dest) {
 	dest->data_length_code = src->dlc;
 	dest->extd = 0; // 0 for standard 11-bit, 1 for extended 29-bit
 	dest->rtr = 0;
-	//dest->ss  = 0;
+
+	/* May cause bus off in case of many lost messages
+	 * Set to 1 to enable single shot mode
+	 * (vehicle may lose frames occasionally) */
+	dest->ss  = 0;
+
 	for(int i = 0; i < src->dlc; i++) {
 		dest->data[i] = src->data[i];
 	}
@@ -181,7 +186,8 @@ CQ_STATUS PushCan( uint8_t canNum, uint8_t TxRx, CAN_FRAME *frame )
 {
 	if( canNum > 1 ) return CQ_IGNORED;
 
-	twai_message_t msg;
+	twai_message_t msg = {0};
+
 	map_to_twai(frame, &msg);
 
 	// We call your existing simple_twai_send wrapper
@@ -200,7 +206,8 @@ CQ_STATUS PopCan( uint8_t canNum, uint8_t TxRx, CAN_FRAME *frame )
 {
 	if( canNum > 1 ) return CQ_IGNORED;
 
-	twai_message_t msg;
+	twai_message_t msg = {0};
+
 	// We call your existing simple_twai_recv wrapper
 	esp_err_t err = simple_twai_recv(twai_channels[canNum], &msg);
 
@@ -244,6 +251,7 @@ void log_twai_bus_status(twai_handle_t bus_a, twai_handle_t bus_b) {
 	
 	// Messages waiting in the software ring buffer
 	ESP_LOGI("","%-20s | %-12lu | %-12lu", "Msgs Queued (RX)", status_a.msgs_to_rx, status_b.msgs_to_rx);
+	ESP_LOGI("","%-20s | %-12lu | %-12lu", "Msgs Queued (TX)", status_a.msgs_to_tx, status_b.msgs_to_tx);
 	
 	// Critical: How many messages were lost because the buffer was full
 	ESP_LOGI("","%-20s | %-12lu | %-12lu", "RX Overruns", status_a.rx_overrun_count, status_b.rx_overrun_count);
@@ -313,16 +321,16 @@ void can_bridge_main_loop() {
 	}
 
 	/* FallThrough test */
-	/*twai_message_t msg;
+	/*twai_message_t msg = {0};
 
 	if (simple_twai_recv(&stw0, &msg) == ESP_OK)
 	{
-		simple_twai_send(&stw0, &msg);
+		simple_twai_send(&stw1, &msg);
 	}
 
 	if (simple_twai_recv(&stw1, &msg) == ESP_OK)
 	{
-		simple_twai_send(&stw1, &msg);
+		simple_twai_send(&stw0, &msg);
 	}*/
 }
 

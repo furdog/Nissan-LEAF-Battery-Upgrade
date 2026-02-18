@@ -3,13 +3,17 @@
 > **ESP-IDF Adapter:** This branch is a specialized **adapter** designed to run STM32 software on ESP-IDF platform and espressif hardware.
 This port does not touch any of the original project files and only adds a wrapper layer to run original code in ESP-IDF environment/hardware.
 
-This is a first version. Only very basic wrapping of core functions are present. Not tested.
+This is a first version. Only very basic wrapping of core functions are present.
+Because of polling nature of twai driver(legacy) there may be stablity issues related with FreeRTOS timings in general.
+Latest test have shown that no RX/TX messages have been lost under normal circumstances.
+
+This software also lacks light sleep mode, which is not critical and may be implemented in future.
 
 Adapted functions:
 ```C
 CQ_STATUS PushCan( uint8_t canNum, uint8_t TxRx, CAN_FRAME *frame );
 CQ_STATUS PopCan( uint8_t canNum, uint8_t TxRx, CAN_FRAME *frame );
-uint8_t LenCan( uint8_t canNum, uint8_t TxRx );
+uint8_t LenCan( uint8_t canNum, uint8_t TxRx ); //Removed, mot used anymore
 ```
 
 ![alt text](https://github.com/dalathegreat/Nissan-LEAF-Battery-Upgrade/blob/main/Software/CANBRIDGE-2port/Banner.jpg)
