@@ -1,0 +1,3 @@
+[submodule "Software/CANBRIDGE-2port/esp_idf/main/sequencer"]
+	path = Software/CANBRIDGE-2port/esp_idf/main/sequencer
+	url = https://github.com/furdog/sequencer.git
