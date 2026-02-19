@@ -11,6 +11,8 @@
 
 #include "esp_task_wdt.h"
 
+#include "sequencer/sequencer.h"
+
 static const char *TAG = "can_bridge_main";
 
 /******************************************************************************
@@ -24,6 +26,10 @@ struct simple_twai
 
 	gpio_num_t tx;
 	gpio_num_t rx;
+
+	/* For statistics */
+	uint32_t tx_counter;
+	uint32_t rx_counter;
 };
 
 esp_err_t simple_twai_init(struct simple_twai *self)
@@ -68,6 +74,9 @@ esp_err_t simple_twai_init(struct simple_twai *self)
 		ESP_LOGE(TAG, "err:%s in %s",  esp_err_to_name(err), __func__);
 	}
 
+	self->tx_counter = 0u;
+	self->rx_counter = 0u;
+
 	return err;
 }
 
@@ -95,6 +104,10 @@ esp_err_t simple_twai_send(struct simple_twai *self,
 		ESP_LOGD(TAG, "err:%s in %s",  esp_err_to_name(err), __func__);
 	}
 
+	if (err == ESP_OK) {
+		self->tx_counter++;
+	}
+
 	return err;
 }
 
@@ -107,6 +120,10 @@ esp_err_t simple_twai_recv(struct simple_twai *self,
 
 	if (err != ESP_OK && err != ESP_ERR_TIMEOUT) {
 		ESP_LOGD(TAG, "err:%s in %s",  esp_err_to_name(err), __func__);
+	}
+
+	if (err == ESP_OK) {
+		self->rx_counter++;
 	}
 
 	return err;
@@ -142,10 +159,111 @@ esp_err_t simple_twai_update(struct simple_twai *self)
 }
 
 /******************************************************************************
+ * LED SEQUENCER
+ *****************************************************************************/
+#include "led_strip.h"
+
+#define RGB_LED_PIN 8
+led_strip_handle_t led_strip;
+
+void led_strip_init() {
+	led_strip_config_t strip_config = {
+		.strip_gpio_num = RGB_LED_PIN,
+		.max_leds = 1,
+	};
+
+	led_strip_rmt_config_t rmt_config = {
+		.resolution_hz = 10 * 1000 * 1000, 
+	};
+
+	led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip);
+}
+
+#define LED_SEQ_MAX_ENTRIES 16u
+
+enum led_seq_event {
+	LED_SEQ_EVENT_NONE,
+
+	LED_SEQ_EVENT_BLANK,
+	LED_SEQ_EVENT_RED,
+	LED_SEQ_EVENT_GREEN
+};
+
+struct sequencer       led_seq;
+struct sequencer_entry led_seq_entries[LED_SEQ_MAX_ENTRIES];
+
+void led_seq_blink_red(uint16_t post_delay_ms)
+{
+	/* Blink red for 250ms */
+	sequencer_add_entry(&led_seq, 0,  LED_SEQ_EVENT_RED);
+	sequencer_add_entry(&led_seq, 50, LED_SEQ_EVENT_BLANK);
+
+	sequencer_add_entry(&led_seq, post_delay_ms, LED_SEQ_EVENT_BLANK);
+}
+
+void led_seq_init() {
+	led_strip_init();
+	sequencer_init(&led_seq, led_seq_entries, LED_SEQ_MAX_ENTRIES);
+}
+
+extern struct simple_twai stw0;
+extern struct simple_twai stw1;
+
+void led_seq_update(uint32_t delta_time_ms)
+{
+	uint8_t ev = 0u;
+	static bool has_fault = true; /* Fault by default */
+
+	/** Fill sequencer only in case if it's empty */
+	if (sequencer_get_entry_count(&led_seq) == 0u) {
+		if ((stw0.rx_counter == 0u) && (stw0.tx_counter == 0u)) {
+			led_seq_blink_red(750);
+
+			has_fault = true;
+		}
+
+		if ((stw1.rx_counter == 0u) && (stw1.tx_counter == 0u)) {
+			led_seq_blink_red(200);
+			led_seq_blink_red(750);
+
+			has_fault = true;
+		}
+
+		/** If no elements was added, it means no errors */
+		if ((sequencer_get_entry_count(&led_seq) == 0u) && has_fault) {
+			sequencer_add_entry(&led_seq, 0, LED_SEQ_EVENT_GREEN);
+			has_fault = false;
+		}
+	}
+
+	ev = sequencer_update(&led_seq, delta_time_ms);
+
+	switch (ev) {
+	case LED_SEQ_EVENT_BLANK:
+		//ESP_LOGW("LED", "BLANK");
+		led_strip_clear(led_strip);
+		led_strip_refresh(led_strip);
+		break;
+	
+	case LED_SEQ_EVENT_RED:
+		//ESP_LOGW("LED", "RED");
+		led_strip_set_pixel(led_strip, 0, 20, 0, 0); 
+		led_strip_refresh(led_strip);
+		break;
+
+	case LED_SEQ_EVENT_GREEN:
+		//ESP_LOGW("LED", "GREEN");
+		led_strip_set_pixel(led_strip, 0, 0, 20, 0); 
+		led_strip_refresh(led_strip);
+		break;
+
+	case LED_SEQ_EVENT_NONE: default: break;
+	}
+}
+
+/******************************************************************************
  * CAN BRIDGE (STM32 to ESP-IDF adapter)
  *****************************************************************************/
-#include "driver/twai.h"
-
 // Array to map canNum (0 or 1) to your bus handles
 extern struct simple_twai stw0;
 extern struct simple_twai stw1;
@@ -307,6 +425,15 @@ void can_bridge_main_loop() {
 		ESP_LOGI(TAG, "sent_tx:    %u", sent_tx);
 		ESP_LOGI(TAG, "recv_rx:    %u", recv_rx);
 		ESP_LOGI(TAG, "cycle_cnt:  %u", cycle_counter);
+		ESP_LOGI(TAG, "stw0 rx:%u tx:%u", stw0.rx_counter, stw0.tx_counter);
+		ESP_LOGI(TAG, "stw1 rx:%u tx:%u", stw1.rx_counter, stw1.tx_counter);
+
+		stw0.rx_counter = 0u;
+		stw0.tx_counter = 0u;
+
+		stw1.rx_counter = 0u;
+		stw1.tx_counter = 0u;
+
 		cycle_counter = 0;
 	}
 
@@ -319,6 +446,8 @@ void can_bridge_main_loop() {
 		idle_seconds = 0;
 		can_handler( MYCAN2, &frame );
 	}
+
+	led_seq_update(delta_time_ms);
 
 	/* FallThrough test */
 	/*twai_message_t msg = {0};
@@ -385,6 +514,8 @@ void app_main(void)
 	stw1.tx = GPIO_NUM_18;
 	stw1.rx = GPIO_NUM_19;
 	simple_twai_init(&stw1);
+
+	led_seq_init();
 
 	/* Force 2011 leaf */
 	//My_Leaf = 0;
