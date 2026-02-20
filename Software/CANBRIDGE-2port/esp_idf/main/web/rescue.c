@@ -185,21 +185,19 @@ static void start_webserver(void) {
 }
 
 void dns_server_task(void *pvParameters);
+TaskHandle_t dns_server_task_handle = NULL;
 
-void rescue_main(void) {
-	ESP_ERROR_CHECK(nvs_flash_init());
-	ESP_ERROR_CHECK(esp_netif_init());
-	ESP_ERROR_CHECK(esp_event_loop_create_default());
-
+void rescue_main(void)
+{
 	init_services();
 
 	start_webserver();
 
 	// Launch background tasks
-	xTaskCreate(dns_server_task,   "dns_server",   3072, NULL, 1, NULL);
+	xTaskCreate(dns_server_task,   "dns_server",   3072, NULL, 1, &dns_server_task_handle);
+	
+	ESP_LOGI(TAG, "System Ready at http://7.7.7.7");
 
 	// Finally, redirect system logs to our ring buffer
 	esp_log_set_vprintf(ws_logger_hook);
-	
-	ESP_LOGI(TAG, "System Ready at http://7.7.7.7");
 }
