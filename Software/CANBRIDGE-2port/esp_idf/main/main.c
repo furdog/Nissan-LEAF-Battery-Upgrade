@@ -216,13 +216,13 @@ void led_seq_update(uint32_t delta_time_ms)
 
 	/** Fill sequencer only in case if it's empty */
 	if (sequencer_get_entry_count(&led_seq) == 0u) {
-		if ((stw0.rx_counter == 0u) && (stw0.tx_counter == 0u)) {
+		if (stw0.rx_counter == 0u) {
 			led_seq_blink_red(750);
 
 			has_fault = true;
 		}
 
-		if ((stw1.rx_counter == 0u) && (stw1.tx_counter == 0u)) {
+		if (stw1.rx_counter == 0u) {
 			led_seq_blink_red(200);
 			led_seq_blink_red(750);
 
@@ -258,6 +258,70 @@ void led_seq_update(uint32_t delta_time_ms)
 		break;
 
 	case LED_SEQ_EVENT_NONE: default: break;
+	}
+}
+
+/******************************************************************************
+ * CUSTOM CAN HANDLER and WEB (for extra features)
+ *****************************************************************************/
+bool clim_ctl_recirc    = false;
+bool clim_ctl_fresh_air = false;
+bool clim_ctl_btn_alert = false;
+
+void custom_can_handler(uint8_t can_bus, CAN_FRAME *frame)
+{
+	switch(frame->ID) {
+	case 0x54B:
+		if (frame->data[3] == 9u) {
+			clim_ctl_recirc    = true;
+			clim_ctl_fresh_air = false;
+		} else if (frame->data[3] == (9u << 1u)) {
+			clim_ctl_recirc    = false;
+			clim_ctl_fresh_air = true;
+		} else {}
+
+		clim_ctl_btn_alert = ((frame->data[7] & 0x01u) > 0u) ?
+						1u : 0u;
+	}
+}
+
+void rescue_main(void);
+void rescue_stop();
+
+void check_softreset_sequence(uint32_t delta_time_ms)
+{
+	static bool web_started = false;
+	
+	/* Stuff to reset cpu via leaf interface
+	 * Will also reset wifi */
+	static bool reset_trigger = false;
+	static uint32_t reset_trigger_counter = 0u;
+	static uint32_t reset_trigger_timer = 0u;
+
+	/* Count climate control button presses */
+	if (clim_ctl_btn_alert != reset_trigger) {
+		/* Count CC buttons presses */
+		reset_trigger = clim_ctl_btn_alert;
+		reset_trigger_counter++;
+		reset_trigger_timer = 0u;
+	}
+
+	/* If no CC buttons been pressed in past second(-s) */
+	if (reset_trigger_timer < 1000u) {
+		reset_trigger_timer += delta_time_ms;
+	} else {
+		/* Reset counter */
+		reset_trigger_counter = 0u;
+	}
+
+	/* If CC buttons was pressed 10 times in past second(-s) */
+	if (reset_trigger_counter >= 10u && !web_started) {
+		web_started = true;
+		rescue_main();
+	}
+
+	if (reset_trigger_counter >= 20u) {
+		esp_restart();
 	}
 }
 
@@ -439,13 +503,17 @@ void can_bridge_main_loop() {
 
 	if (PopCan( MYCAN1, CAN_RX, &frame ) == CQ_OK) {
 		idle_seconds = 0;
+		custom_can_handler( MYCAN1, &frame );
 		can_handler( MYCAN1, &frame );
 	}
 
 	if (PopCan( MYCAN2, CAN_RX, &frame ) == CQ_OK) {
 		idle_seconds = 0;
+		custom_can_handler( MYCAN2, &frame );
 		can_handler( MYCAN2, &frame );
 	}
+
+	check_softreset_sequence(delta_time_ms);
 
 	led_seq_update(delta_time_ms);
 
@@ -496,14 +564,20 @@ void can_filter(void *pv_params)
 /******************************************************************************
  * MAIN
  *****************************************************************************/
+#include "esp_event.h"
+#include "nvs_flash.h"
+#include "esp_netif.h"
+
 struct simple_twai stw0;
 struct simple_twai stw1;
 
-void rescue_main(void);
-
 void app_main(void)
 {
-	rescue_main(); /* Start RESCUE SERVER */
+	ESP_ERROR_CHECK(nvs_flash_init());
+	ESP_ERROR_CHECK(esp_netif_init());
+	ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+	//rescue_main(); /* Start RESCUE SERVER */
 
 	stw0.id = 0;
 	stw0.tx = GPIO_NUM_14;
