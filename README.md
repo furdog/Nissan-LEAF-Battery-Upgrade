@@ -16,6 +16,17 @@ CQ_STATUS PopCan( uint8_t canNum, uint8_t TxRx, CAN_FRAME *frame );
 uint8_t LenCan( uint8_t canNum, uint8_t TxRx ); //Removed, mot used anymore
 ```
 
+## ESP-IDF extra features
+(Boards with LED pin 8) Builtin rgb LED blinks with certain intervals if RX on any bus is missing.
+- 1 red blink = bus 1 rx missing
+- 2 red blinks = bus 2 rx missing
+- constant green = both busses have RX
+
+
+wifi start (automatically disabled).
+- Press AC recirculation 10 times in a row, with less than 1 sec intervals to start rescue wifi (pass:12345678)
+- Press AC recirculation 20 times in a row with less than 1 sec intervals to reset ESP board
+
 ![alt text](https://github.com/dalathegreat/Nissan-LEAF-Battery-Upgrade/blob/main/Software/CANBRIDGE-2port/Banner.jpg)
 
 # Nissan-LEAF-Battery-Upgrade
