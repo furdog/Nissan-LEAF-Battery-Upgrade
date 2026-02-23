@@ -74,6 +74,7 @@ extern void ws_server_init(struct ws_server *self)
 
 	/* 1. Init ring buffers */
 	self->rb.text_tx = NULL;
+	self->rb.text_rx = NULL;
 
 	/* 2. Init locks */
 	self->lc.client_list = NULL;
@@ -136,15 +137,15 @@ extern void ws_server_stop(struct ws_server *self)
 
 	ESP_LOGI(TAG, "stop()");
 
-	httpd_unregister_uri_handler(self->httpd_handle, self->ws_uri.uri,
-				     self->ws_uri.method);
+	httpd_unregister_uri_handler(*self->httpd_handle, self->ws_uri.uri,
+				      self->ws_uri.method);
 
 	/* 1. Signal the task to stop */
 	self->is_running = false;
 
 	/* 2. Give the task time to exit its loop and delete itself */
 	while (self->task_handle != NULL) {
-		vTaskDelay(pdMS_TO_TICKS(10));
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
 
 	// 3. Clean up memory/mutexes
@@ -347,7 +348,7 @@ extern esp_err_t ws_server_client_del(struct ws_server *self, int fd)
 	esp_err_t err = ESP_OK;
 
 	/* 1. Check arguments */
-	if ((self == NULL) || (fd < 0)) {
+	if ((self == NULL) || (fd < 0) || (self->lc.client_list == NULL)) {
 		ESP_LOGE(TAG, "(del) Invalid argument/s");
 		err = ESP_ERR_INVALID_ARG;
 

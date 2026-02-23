@@ -1,11 +1,12 @@
-#include "esp_log.h"
-#include "lwip/sockets.h"
-#include "esp_netif.h"
-#include "dns_tools.h"
+#include "dns_server.h"
 
 /*****************************************************************************
  * DNS
  *****************************************************************************/
+static TaskHandle_t dns_server_task_handle = NULL;
+static volatile int sock;
+static volatile bool dns_server_running = false;
+
 static const char *TAG = "dns_server";
 
 /** This task redirects all incoming DNS requests to 7.7.7.7 */
@@ -18,12 +19,12 @@ void dns_server_task(void *pvParameters) {
 		.sin_port = htons(53)
 	};
 
-	int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+	sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
 	bind(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
 
 	ESP_LOGI(TAG, "sniffer Active.");
 
-	while (1) {
+	while (dns_server_running) {
 		struct sockaddr_in source_addr;
 		socklen_t addr_len = sizeof(source_addr);
 		int len = recvfrom(sock, data, sizeof(data), 0,
@@ -63,5 +64,37 @@ void dns_server_task(void *pvParameters) {
 			ESP_LOGI(TAG, "Query is malformed dns_tools.h, line: %u",
 				 msg.malformed);
 		}
+
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
+
+	ESP_LOGI(TAG, "Socket closed cleanly");
+	dns_server_task_handle = NULL;
+	vTaskDelete(NULL);
+}
+
+void dns_server_stop()
+{
+	ESP_LOGI(TAG, "Stopping DNS server");
+
+	/* Close sock to exit blocking recvfrom */
+	close(sock);
+
+	/* 1. Signal the task to stop */
+	dns_server_running = false;	
+
+	/* 2. Give the task time to exit its loop and delete itself */
+	while (dns_server_task_handle != NULL) {
+		vTaskDelay(pdMS_TO_TICKS(1));
+	}
+
+	ESP_LOGI(TAG, "Stopped DNS server");
+}
+
+void dns_server_start()
+{
+	ESP_LOGI(TAG, "Starting DNS server");
+	dns_server_running = true;
+	xTaskCreate(dns_server_task, "dns_server", 3072, NULL, 1,
+		    &dns_server_task_handle);
 }

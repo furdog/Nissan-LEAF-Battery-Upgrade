@@ -285,18 +285,19 @@ void custom_can_handler(uint8_t can_bus, CAN_FRAME *frame)
 	}
 }
 
-void rescue_main(void);
+void rescue_start(void);
 void rescue_stop();
 
 void check_softreset_sequence(uint32_t delta_time_ms)
 {
-	static bool web_started = false;
-	
 	/* Stuff to reset cpu via leaf interface
 	 * Will also reset wifi */
 	static bool reset_trigger = false;
 	static uint32_t reset_trigger_counter = 0u;
 	static uint32_t reset_trigger_timer = 0u;
+
+	static bool web_reset = false;
+	//static bool cpu_reset = false;
 
 	/* Count climate control button presses */
 	if (clim_ctl_btn_alert != reset_trigger) {
@@ -311,13 +312,16 @@ void check_softreset_sequence(uint32_t delta_time_ms)
 		reset_trigger_timer += delta_time_ms;
 	} else {
 		/* Reset counter */
+		web_reset = false;
 		reset_trigger_counter = 0u;
 	}
 
 	/* If CC buttons was pressed 10 times in past second(-s) */
-	if (reset_trigger_counter >= 10u && !web_started) {
-		web_started = true;
-		rescue_main();
+	if (reset_trigger_counter >= 10u && !web_reset) {
+		web_reset = true;
+
+		rescue_stop();
+		rescue_start();
 	}
 
 	if (reset_trigger_counter >= 20u) {
@@ -577,7 +581,7 @@ void app_main(void)
 	ESP_ERROR_CHECK(esp_netif_init());
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-	//rescue_main(); /* Start RESCUE SERVER */
+	//rescue_start(); /* Start RESCUE SERVER */
 
 	stw0.id = 0;
 	stw0.tx = GPIO_NUM_14;

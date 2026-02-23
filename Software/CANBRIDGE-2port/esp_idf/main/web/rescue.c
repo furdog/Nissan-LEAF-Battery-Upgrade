@@ -55,8 +55,8 @@ int ws_logger_hook(const char *fmt, va_list tag) {
 		written = vsnprintf(buf, sizeof(buf), fmt, args_copy);
 
 		if ((strstr(buf, "ws_server")  == NULL) &&
-		    (strstr(buf, "httpd_txrx") == NULL) &&
-                    (strstr(buf, "httpd_ws")   == NULL)) {
+			(strstr(buf, "httpd_txrx") == NULL) &&
+					(strstr(buf, "httpd_ws")   == NULL)) {
 			ws_server_broadcast_text(&ws_server, buf, written);
 		}
 
@@ -102,9 +102,12 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 	}
 }
 
-static void init_services() {    
+esp_netif_t *ap_netif = NULL;
+
+static void init_services()
+{    
 	// 1. Wi-Fi Config
-	esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
+	ap_netif = esp_netif_create_default_wifi_ap();
 	esp_netif_ip_info_t ip_info;
 	esp_netif_set_ip4_addr(&ip_info.ip, 7, 7, 7, 7);
 	esp_netif_set_ip4_addr(&ip_info.gw, 7, 7, 7, 7);
@@ -116,7 +119,7 @@ static void init_services() {
 	wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 	cfg.static_rx_buf_num = 16; // Stability boost
 	ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-	ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL));
+	//ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL));
 
 	wifi_config_t wifi_config = {
 		.ap = { .ssid = "ESP32_RESCUE_PORTAL", .channel = 1, .password = "12345678", 
@@ -126,6 +129,28 @@ static void init_services() {
 	ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
 	ESP_ERROR_CHECK(esp_wifi_start());
 	esp_wifi_set_inactive_time(WIFI_IF_AP, 300);
+}
+
+static void deinit_services()
+{
+	// 1. Stop Wi-Fi hardware
+	esp_err_t err = esp_wifi_stop();
+	if (err != ESP_OK) ESP_LOGE("DEINIT", "Wifi stop failed: %s", esp_err_to_name(err));
+
+	// 2. Clear the mode (Forces internal cleanup)
+	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_NULL));
+
+	// 3. Unregister handlers (Crucial: Use the same handler function pointer)
+	//ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, NULL));
+
+	// 4. De-init Wi-Fi driver
+	ESP_ERROR_CHECK(esp_wifi_deinit());
+
+	// 5. Destroy Netif
+	if (ap_netif) {
+		esp_netif_destroy_default_wifi(ap_netif);
+		ap_netif = NULL; // Prevent dangling pointer
+	}
 }
 
 static esp_err_t qrcode_js_handler(httpd_req_t *req) {
@@ -184,20 +209,41 @@ static void start_webserver(void) {
 	ws_server_start(&ws_server, &server);
 }
 
-void dns_server_task(void *pvParameters);
-TaskHandle_t dns_server_task_handle = NULL;
+static void stop_webserver(void) {
+	ws_server_stop(&ws_server);
+	httpd_stop(server);
+}
 
-void rescue_main(void)
+#include "dns_server.h"
+
+void rescue_start(void)
 {
 	init_services();
 
 	start_webserver();
 
 	// Launch background tasks
-	xTaskCreate(dns_server_task,   "dns_server",   3072, NULL, 1, &dns_server_task_handle);
+	dns_server_start();
 	
 	ESP_LOGI(TAG, "System Ready at http://7.7.7.7");
 
 	// Finally, redirect system logs to our ring buffer
 	esp_log_set_vprintf(ws_logger_hook);
+}
+
+void rescue_stop(void)
+{
+	// 1. First, restore standard logging to console
+	esp_log_set_vprintf(vprintf);
+
+	// 2. Kill the DNS task before the network it relies on disappears
+	dns_server_stop();
+
+	// 3. Stop the webserver (which stops WebSockets)
+	stop_webserver();
+
+	// 4. Tear down the Wi-Fi and Netif
+	deinit_services();
+	
+	ESP_LOGI("RESCUE", "Portal stopped successfully.");
 }

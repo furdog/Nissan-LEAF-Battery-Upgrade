@@ -169,7 +169,8 @@ static void dns_msg_parse_query(struct dns_msg *self, size_t len)
 
 /** Adds answer to buffer that was derived from query parser.
  *  Returns total number of answer bytes (basically raw UDP payload length) */
-size_t dns_msg_add_answer(struct dns_msg *self, uint8_t *answer, size_t len)
+static size_t dns_msg_add_answer(struct dns_msg *self, uint8_t *answer,
+				 size_t len)
 {
 	size_t total_len = (self->_ofs + len);
 
