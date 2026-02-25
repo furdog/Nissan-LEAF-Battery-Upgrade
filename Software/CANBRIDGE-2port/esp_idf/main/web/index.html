@@ -132,8 +132,12 @@
     </script>
 
 
-	<input type="file" id="ota_file">
-	<button onclick="doUpload()">Update</button>
+	<input type="file" id="ota_file" style="width: 100%">
+	<button onclick="doUpload()" style="width: 100%">Update</button>
+	</br>
+	<button onclick="fetch('/bypass')" style="width: 100%">Bypass Filter</button>
+   	</br>
+	<button onclick="fetch('/reset')" style="width: 100%">Reset Filter</button>
 
 	<script>
 	async function doUpload() {

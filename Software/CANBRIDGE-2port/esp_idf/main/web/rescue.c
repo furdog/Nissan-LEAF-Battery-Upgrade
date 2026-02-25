@@ -17,7 +17,7 @@
 #include "esp_debug_helpers.h"
 
 static const char *TAG = "RESCUE_SERVER";
-static httpd_handle_t server = NULL;
+httpd_handle_t server = NULL;
 
 /* Embedded Files */
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
