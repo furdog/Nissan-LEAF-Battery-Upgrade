@@ -216,8 +216,17 @@ static void stop_webserver(void) {
 
 #include "dns_server.h"
 
+bool rescue_started = false;
+
+/* Warning - not thread safe! */
 void rescue_start(void)
 {
+	if (rescue_started) {
+		return;
+	} else {
+		rescue_started = true;
+	}
+
 	init_services();
 
 	start_webserver();
@@ -231,8 +240,15 @@ void rescue_start(void)
 	esp_log_set_vprintf(ws_logger_hook);
 }
 
+/* Warning - not thread safe! */
 void rescue_stop(void)
 {
+	if (!rescue_started) {
+		return;
+	} else {
+		rescue_started = false;
+	}
+
 	// 1. First, restore standard logging to console
 	esp_log_set_vprintf(vprintf);
 
@@ -246,4 +262,6 @@ void rescue_stop(void)
 	deinit_services();
 	
 	ESP_LOGI("RESCUE", "Portal stopped successfully.");
+
+	rescue_started = false;
 }

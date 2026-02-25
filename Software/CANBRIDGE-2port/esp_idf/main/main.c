@@ -308,7 +308,7 @@ void check_softreset_sequence(uint32_t delta_time_ms)
 	}
 
 	/* If no CC buttons been pressed in past second(-s) */
-	if (reset_trigger_timer < 1000u) {
+	if (reset_trigger_timer < 500u) {
 		reset_trigger_timer += delta_time_ms;
 	} else {
 		/* Reset counter */
