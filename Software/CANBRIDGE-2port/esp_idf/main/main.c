@@ -264,6 +264,38 @@ void led_seq_update(uint32_t delta_time_ms)
 /******************************************************************************
  * CUSTOM CAN HANDLER and WEB (for extra features)
  *****************************************************************************/
+#include "esp_http_server.h"
+
+/* Bypass can filter messages */
+bool can_filter_bypass = false;
+
+/* Custom handlers */
+extern httpd_handle_t server; /* TODO refactor */
+
+esp_err_t can_filter_bypass_callback(httpd_req_t *req)
+{
+	ESP_LOGW(TAG, "Bypass mode enabled, to exit - perform reset");
+	can_filter_bypass = true;
+	httpd_resp_send(req, NULL, 0);
+	return ESP_OK;
+}
+
+esp_err_t can_filter_reset_callback(httpd_req_t *req)
+{
+	esp_restart();
+	httpd_resp_send(req, NULL, 0);
+	return ESP_OK;
+}
+
+void register_custom_handlers() {
+	static httpd_uri_t uris[2] = {
+		{ .uri = "/bypass", .method = HTTP_GET, .handler = can_filter_bypass_callback },
+		{ .uri = "/reset",  .method = HTTP_GET, .handler = can_filter_reset_callback }
+	};
+
+	for (int i = 0; i < 2; i++) httpd_register_uri_handler(server, &uris[i]);
+}
+
 bool clim_ctl_recirc    = false;
 bool clim_ctl_fresh_air = false;
 bool clim_ctl_btn_alert = false;
@@ -322,6 +354,7 @@ void check_softreset_sequence(uint32_t delta_time_ms)
 
 		rescue_stop();
 		rescue_start();
+		register_custom_handlers();
 	}
 
 	if (reset_trigger_counter >= 20u) {
@@ -505,34 +538,35 @@ void can_bridge_main_loop() {
 		cycle_counter = 0;
 	}
 
-	if (PopCan( MYCAN1, CAN_RX, &frame ) == CQ_OK) {
-		idle_seconds = 0;
-		custom_can_handler( MYCAN1, &frame );
-		can_handler( MYCAN1, &frame );
-	}
+	if (!can_filter_bypass) {
+		if (PopCan( MYCAN1, CAN_RX, &frame ) == CQ_OK) {
+			idle_seconds = 0;
+			custom_can_handler( MYCAN1, &frame );
+			can_handler( MYCAN1, &frame );
+		}
 
-	if (PopCan( MYCAN2, CAN_RX, &frame ) == CQ_OK) {
-		idle_seconds = 0;
-		custom_can_handler( MYCAN2, &frame );
-		can_handler( MYCAN2, &frame );
+		if (PopCan( MYCAN2, CAN_RX, &frame ) == CQ_OK) {
+			idle_seconds = 0;
+			custom_can_handler( MYCAN2, &frame );
+			can_handler( MYCAN2, &frame );
+		}
+	} else {
+		/* FallThrough test */
+		twai_message_t msg = {0};
+
+		if (simple_twai_recv(&stw0, &msg) == ESP_OK)
+		{
+			simple_twai_send(&stw1, &msg);
+		}
+
+		if (simple_twai_recv(&stw1, &msg) == ESP_OK)
+		{
+			simple_twai_send(&stw0, &msg);
+		}
 	}
 
 	check_softreset_sequence(delta_time_ms);
-
 	led_seq_update(delta_time_ms);
-
-	/* FallThrough test */
-	/*twai_message_t msg = {0};
-
-	if (simple_twai_recv(&stw0, &msg) == ESP_OK)
-	{
-		simple_twai_send(&stw1, &msg);
-	}
-
-	if (simple_twai_recv(&stw1, &msg) == ESP_OK)
-	{
-		simple_twai_send(&stw0, &msg);
-	}*/
 }
 
 /* Port from arduino */
