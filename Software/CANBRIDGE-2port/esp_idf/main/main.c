@@ -520,14 +520,14 @@ void can_bridge_main_loop() {
 	if (timer2_ms >= 5000u) {
 		timer2_ms -= 5000u;
 
-		log_twai_bus_status(stw0.bus, stw1.bus);
+		/*log_twai_bus_status(stw0.bus, stw1.bus);
 		ESP_LOGI(TAG, "My_Leaf:    %u", My_Leaf);
 		ESP_LOGI(TAG, "My_Battery: %u", My_Battery);
 		ESP_LOGI(TAG, "sent_tx:    %u", sent_tx);
 		ESP_LOGI(TAG, "recv_rx:    %u", recv_rx);
 		ESP_LOGI(TAG, "cycle_cnt:  %u", cycle_counter);
 		ESP_LOGI(TAG, "stw0 rx:%u tx:%u", stw0.rx_counter, stw0.tx_counter);
-		ESP_LOGI(TAG, "stw1 rx:%u tx:%u", stw1.rx_counter, stw1.tx_counter);
+		ESP_LOGI(TAG, "stw1 rx:%u tx:%u", stw1.rx_counter, stw1.tx_counter);*/
 
 		stw0.rx_counter = 0u;
 		stw0.tx_counter = 0u;
@@ -577,7 +577,7 @@ void yieldIfNecessary(void)
 
 	if ((now - lastYield) > 2000) {
 		lastYield = now;
-		vTaskDelay(5);  //delay 1 RTOS tick
+		vTaskDelay(1);  //delay 1 RTOS tick (was 5)
 	}
 }
 
