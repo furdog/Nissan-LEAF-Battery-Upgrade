@@ -22,10 +22,23 @@ uint8_t LenCan( uint8_t canNum, uint8_t TxRx ); //Removed, mot used anymore
 - 2 red blinks = bus 2 rx missing
 - constant green = both busses have RX
 
-
-wifi start (automatically disabled).
+wifi start (automatically disabled)
 - Press AC recirculation 10 times in a row, with less than 1 sec intervals to start rescue wifi (pass:12345678)
 - Press AC recirculation 20 times in a row with less than 1 sec intervals to reset ESP board
+
+(rescue web interface)
+- prints important system logs (not debug logs)
+- can reset esp32
+- can enable bypass mode (test)
+- provides OTA firmware update (uploads bin file)
+> (detailed TWAI logs are currently disabled, due to UART blocking behaviour)
+
+## TODO
+- implement sleep mode
+- implement sdk/project config
+- implement better WEB/WS interface
+- implement better UART (non-blocking) logic
+- migrate to new TWAI driver
 
 ![alt text](https://github.com/dalathegreat/Nissan-LEAF-Battery-Upgrade/blob/main/Software/CANBRIDGE-2port/Banner.jpg)
 
