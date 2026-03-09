@@ -169,6 +169,26 @@ void ws_client_del_thread_safe(httpd_handle_t hd, int fd)
 	close(fd);
 }
 
+#include "sdkconfig.h"
+#include "esp_app_desc.h"
+
+esp_err_t version_get_handler(httpd_req_t *req) {
+	httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+
+	const esp_app_desc_t *app_desc = esp_app_get_description();
+    
+	char json_response[256];
+	snprintf(json_response, sizeof(json_response), 
+		"{\"version\": \"%s\", \"hw_rev\": \"%s\", \"env\": \"%s\", \"idf_ver\": \"%s\"}", 
+		app_desc->version,
+		CONFIG_APP_HARDWARE_REVISION,
+		CONFIG_APP_ENVIRONMENT,
+		app_desc->idf_ver);
+    
+	httpd_resp_set_type(req, "application/json");
+	return httpd_resp_send(req, json_response, HTTPD_RESP_USE_STRLEN);
+}
+
 extern esp_err_t update_options_handler(httpd_req_t *req);
 extern esp_err_t update_post_handler(httpd_req_t *req);
 
@@ -184,7 +204,7 @@ static void start_webserver(void) {
 	config.keep_alive_interval = 2;    // 2 seconds between probes
 	config.keep_alive_count    = 3;    // 3 failed probes = close socket
 
-	config.max_uri_handlers = 12;
+	config.max_uri_handlers = 20;
 
 	/* Register websocket stuff */
 	config.close_fn = ws_client_del_thread_safe;
@@ -192,16 +212,17 @@ static void start_webserver(void) {
 	ws_server_init(&ws_server);
 
 	if (httpd_start(&server, &config) == ESP_OK) {
-		static httpd_uri_t uris[7] = {
+		static httpd_uri_t uris[8] = {
 			{ .uri = "/", .method = HTTP_GET, .handler = index_get_handler },
 			{ .uri = "/qrcode.min.js", .method = HTTP_GET, .handler = qrcode_js_handler },
 			{ .uri = "/generate_204", .method = HTTP_GET, .handler = captive_portal_redirect_handler },
 			{ .uri = "/ncsi.txt", .method = HTTP_GET, .handler = captive_portal_redirect_handler },
 			{ .uri = "/redirect", .method = HTTP_GET, .handler = captive_portal_redirect_handler },
 			{ .uri = "/update", .method = HTTP_OPTIONS, .handler = update_options_handler },
-			{ .uri = "/update", .method = HTTP_POST, .handler = update_post_handler }
+			{ .uri = "/update", .method = HTTP_POST, .handler = update_post_handler },
+			{ .uri = "/api/version", .method = HTTP_GET, .handler = version_get_handler }
 		};
-		for (int i = 0; i < 7; i++) httpd_register_uri_handler(server, &uris[i]);
+		for (int i = 0; i < 8; i++) httpd_register_uri_handler(server, &uris[i]);
 
 		//httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, captive_portal_redirect_handler);
 	}

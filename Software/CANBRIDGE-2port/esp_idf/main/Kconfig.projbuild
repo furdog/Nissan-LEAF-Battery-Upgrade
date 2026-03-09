@@ -1,0 +1,13 @@
+menu "Application Metadata"
+    config APP_HARDWARE_REVISION
+        string "Hardware Revision"
+        default "h3"
+        help
+            The hardware version this firmware is targeting.
+
+    config APP_ENVIRONMENT
+        string "Deployment Environment"
+        default "production"
+        help
+            Example: staging, production, or development.
+endmenu
